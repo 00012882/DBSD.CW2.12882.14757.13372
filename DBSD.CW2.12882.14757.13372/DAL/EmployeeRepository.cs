@@ -1,0 +1,233 @@
+﻿using DBSD.CW2._12882._14757._13372.Models;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Linq;
+using System.Web;
+using System.Web.Configuration;
+
+namespace DBSD.CW2._12882._14757._13372.DAL
+{
+    public class EmployeeRepository : IEmployeeRepository
+    {
+        private string ConnStr
+        {
+            get
+            {
+                return WebConfigurationManager.ConnectionStrings["BelissimoConnStr"].ConnectionString;
+            }
+        }
+        public IList<Employee> GetAll()
+        {
+            IList<Employee> employees = new List<Employee>();
+            using (var conn = new SqlConnection(ConnStr))
+            {
+                using(var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"SELECT [EmployeeID]
+                                              ,[FirstName]
+                                              ,[LastName]
+                                              ,[Phone]
+                                              ,[Email]
+                                              ,[HireDate]
+                                              ,[EmployeeImage]
+                                              ,[FullTimeEmployee]
+                                          FROM [dbo].[Employees]";
+                    conn.Open();
+                    using(var  rdr = cmd.ExecuteReader())
+                    {
+                        while (rdr.Read())
+                        {
+                            var emp = new Employee();
+                            emp.EmployeeId = rdr.GetInt32(rdr.GetOrdinal("EmployeeId"));
+                            emp.FirstName = rdr.GetString(rdr.GetOrdinal("FirstName"));
+                            emp.LastName = rdr.GetString(rdr.GetOrdinal("LastName"));
+                            emp.Phone = rdr.GetString(rdr.GetOrdinal("Phone"));
+                            emp.Email = rdr.GetString(rdr.GetOrdinal("Email"));
+                            emp.HireDate = rdr.GetDateTime(rdr.GetOrdinal("HireDate"));
+                            if (!(rdr.IsDBNull(rdr.GetOrdinal("EmployeeImage"))))
+                            {
+                                emp.EmployeeImage = (byte[])rdr["EmployeeImage"];
+                            }
+
+                            emp.FullTimeEmployee = rdr.GetBoolean(rdr.GetOrdinal("FullTimeEmployee"));
+
+                            employees.Add(emp);
+                        }
+                    }
+                }
+            }
+
+            return employees;
+        }
+
+        public Employee GetById(int id)
+        {
+            Employee employee = null;
+            using(var conn = new SqlConnection(ConnStr))
+            {
+                using(var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"SELECT [EmployeeID]
+                                              ,[FirstName]
+                                              ,[LastName]
+                                              ,[Phone]
+                                              ,[Email]
+                                              ,[HireDate]
+                                              ,[EmployeeImage]
+                                              ,[FullTimeEmployee]
+                                          FROM [dbo].[Employees]
+                                          WHERE EmployeeID = @EmployeeID
+                                                                        ";
+                    cmd.Parameters.AddWithValue("@EmployeeID", id);
+                    conn.Open();
+
+                    using(var rdr = cmd.ExecuteReader())
+                    {
+                        if(rdr.Read())
+                        {
+                            employee = new Employee()
+                            {
+                                EmployeeId = id,
+                                FirstName = rdr.GetString(rdr.GetOrdinal("FirstName")),
+                                LastName = rdr.GetString(rdr.GetOrdinal("LastName")),
+                                Phone = rdr.GetString(rdr.GetOrdinal("Phone")),
+                                Email = rdr.GetString(rdr.GetOrdinal("Email")),
+                                HireDate = rdr.GetDateTime(rdr.GetOrdinal("HireDate")),
+                                EmployeeImage = rdr.IsDBNull(rdr.GetOrdinal("EmployeeImage")) ? null : (byte[])rdr["EmployeeImage"],
+                                FullTimeEmployee = rdr.GetBoolean(rdr.GetOrdinal("FullTimeEmployee")),
+                            };
+                        }
+                    }
+                }
+
+                return employee;
+            }
+        }
+
+        public void Insert(Employee emp)
+        {
+            using(var conn = new SqlConnection(ConnStr))
+            {
+                using(var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"INSERT INTO [dbo].[Employees]
+                                                       ([FirstName]
+                                                       ,[LastName]
+                                                       ,[Phone]
+                                                       ,[Email]
+                                                       ,[HireDate]
+                                                       ,[EmployeeImage]
+                                                       ,[FullTimeEmployee])
+                                                 VALUES
+                                                       (@FirstName
+                                                       ,@LastName
+                                                       ,@Phone
+                                                       ,@Email
+                                                       ,@HireDate
+                                                       ,@EmployeeImage
+                                                       ,@FullTimeEmployee)";
+
+                    cmd.Parameters.AddWithValue("@FirstName", emp.FirstName);
+                    cmd.Parameters.AddWithValue("@LastName", emp.FirstName);
+                    cmd.Parameters.AddWithValue("@Phone", emp.Phone);
+                    cmd.Parameters.AddWithValue("@Email", emp.Email);
+                    cmd.Parameters.AddWithValue("@HireDate", emp.HireDate);
+
+                    if (emp.EmployeeImage != null)
+                    {
+                        cmd.Parameters.Add("@EmployeeImage", SqlDbType.VarBinary, -1).Value = emp.EmployeeImage;
+                    }
+                    else
+                    {
+                        cmd.Parameters.Add("@EmployeeImage", SqlDbType.VarBinary, -1).Value = DBNull.Value;
+                    }
+
+                    cmd.Parameters.AddWithValue("@FullTimeEmployee", emp.FullTimeEmployee);
+
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public void Update(Employee emp)
+        {
+            using(var conn = new SqlConnection(ConnStr))
+            {
+                using(var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"UPDATE [dbo].[Employees]
+                                           SET [FirstName] = @FirstName
+                                              ,[LastName] = @LastName
+                                              ,[Phone] = @Phone
+                                              ,[Email] = @Email
+                                              ,[HireDate] = @HireDate
+                                              ,[EmployeeImage] = @EmployeeImage
+                                              ,[FullTimeEmployee] = @FullTimeEmployee
+
+                                         WHERE EmployeeID = @EmployeeID";
+
+                    cmd.Parameters.AddWithValue("@FirstName", emp.FirstName);
+                    cmd.Parameters.AddWithValue("@LastName", emp.FirstName);
+                    cmd.Parameters.AddWithValue("@Phone", emp.Phone);
+                    cmd.Parameters.AddWithValue("@Email", emp.Email);
+                    cmd.Parameters.AddWithValue("@HireDate", emp.HireDate);
+
+                    if (emp.EmployeeImage != null)
+                    {
+                        cmd.Parameters.Add("@EmployeeImage", SqlDbType.VarBinary, -1).Value = emp.EmployeeImage;
+                    }
+                    else
+                    {
+                        cmd.Parameters.Add("@EmployeeImage", SqlDbType.VarBinary, -1).Value = DBNull.Value;
+                    }
+
+                    cmd.Parameters.AddWithValue("@FullTimeEmployee", emp.FullTimeEmployee);
+                    cmd.Parameters.AddWithValue("@EmployeeID", emp.EmployeeId);
+
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public int DeleteWithStoredProc(int id) 
+        {
+            using(var conn = new SqlConnection(ConnStr))
+            {
+                using(var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"[dbo].[delEmployees]";
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("id", id);
+
+                    var pErr = cmd.CreateParameter();
+                    pErr.ParameterName = "err";
+                    pErr.Direction = ParameterDirection.Output;
+                    pErr.SqlDbType = SqlDbType.VarChar;
+                    pErr.Size = 1000;
+                    cmd.Parameters.Add(pErr);
+
+                    var pRet = cmd.CreateParameter();
+                    pRet.Direction = ParameterDirection.ReturnValue;
+
+                    cmd.Parameters.Add(pRet);
+
+                    conn.Open();
+                    cmd.ExecuteNonQuery();
+
+                    int retVal = (int)pRet.Value;
+                    string err = (string)pErr.Value;
+
+                    if (retVal < 0)
+                    {
+                        throw new Exception(err);
+                    }
+                    return retVal;
+                }
+            }
+        }
+    }
+}
