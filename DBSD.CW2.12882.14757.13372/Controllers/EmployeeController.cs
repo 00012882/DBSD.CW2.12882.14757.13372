@@ -7,17 +7,42 @@ using System.IO;
 using System.Linq;
 using System.Web;
 using System.Web.Mvc;
+using X.PagedList;
 
 namespace DBSD.CW2._12882._14757._13372.Controllers
 {
     public class EmployeeController : Controller
     {
         // GET: Employee
-        public ActionResult Index()
+        public ActionResult Index(string FirstName, string LastName, DateTime? HireDate, int? page, string sort)
         {
+            int pageNumber = page ?? 1;
+            int totalCount;
+            int pageSize = 3;
+
+            string sortField = "FirstName";
+            bool sortFullTimeEmployee = false;
+            if (!string.IsNullOrWhiteSpace(sort))
+            {
+                string[] arr = sort.Split('_');
+                if(arr?.Length == 2)
+                {
+                    sortField = arr[0];
+                    sortFullTimeEmployee = arr[1] == "FULLTIMEEMPLOYEE";
+                }
+            }
+
             var repository = new EmployeeRepository();
-            var employees = repository.GetAll();
-            return View(employees);
+            var employees = repository.Filter(FirstName, LastName, HireDate, pageNumber, pageSize,
+                sortField, sortFullTimeEmployee, out totalCount);
+            var pagedList = new StaticPagedList<Employee>(employees, pageNumber, pageSize, totalCount);
+
+            ViewBag.FirstNameSort = sort == "FirstName_ASC" ? "FirstName_FULLTIMEEMPLOYEE" : "FirstName_ASC";
+            ViewBag.LastNameSort = sort == "LastName_ASC" ? "LastName_FULLTIMEEMPLOYEE" : "LastName_ASC";
+            ViewBag.CurrentPage = page;
+            ViewBag.CurrentSort = sort;
+
+            return View(pagedList);
         }
 
         // GET: Employee/Details/5

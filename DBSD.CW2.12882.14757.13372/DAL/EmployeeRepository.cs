@@ -229,5 +229,88 @@ namespace DBSD.CW2._12882._14757._13372.DAL
                 }
             }
         }
+
+        public IList<Employee> Filter(string FirstName, string LastName, DateTime? HireDate, int page, int pageSize,
+                               string sortField, bool sortFullTimeEmployee, out int totalCount)
+        {
+            IList<Employee> employees = new List<Employee>();
+            using (var conn = new SqlConnection(ConnStr))
+            {
+                using (var cmd = conn.CreateCommand())
+                {
+                    string fields =     @" [EmployeeID]
+                                              ,[FirstName]
+                                              ,[LastName]
+                                              ,[Phone]
+                                              ,[Email]
+                                              ,[HireDate]
+                                              ,[EmployeeImage]
+                                              ,[FullTimeEmployee]";
+
+                    string sql = @"SELECT 
+                                              {0}
+                                          FROM [dbo].[Employees]";
+
+                    string whereSql =  "";
+                    if (!string.IsNullOrWhiteSpace(FirstName))
+                    {
+                        whereSql += (whereSql.Length == 0 ? "" : " AND " ) + " FirstName like @FirstName + '%' ";
+                        cmd.Parameters.AddWithValue("@FirstName", FirstName);
+                    }
+                    if (!string.IsNullOrWhiteSpace(LastName))
+                    {
+                        whereSql += (whereSql.Length == 0 ? "" : " AND ") + " LastName like @LastName + '%' ";
+                        cmd.Parameters.AddWithValue("@LastName", LastName);
+                    }
+                    if (HireDate.HasValue)
+                    {
+                        whereSql += (whereSql.Length == 0 ? "" : " AND ") + " HireDate <=  @HireDate ";
+                        cmd.Parameters.AddWithValue("@HireDate", HireDate);
+                    }
+                    if (!string.IsNullOrWhiteSpace(whereSql))
+                    {
+                        whereSql = " WHERE " + whereSql;
+                    }
+
+                    conn.Open();
+                    cmd.CommandText = string.Format(sql, " count(*) ") + whereSql;
+                    totalCount = (int) cmd.ExecuteScalar();
+
+                    string pageSql = " OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY ";
+                    cmd.Parameters.AddWithValue("@offset", (page - 1) * pageSize);
+                    cmd.Parameters.AddWithValue("@pageSize", pageSize);
+
+                    if(string.IsNullOrWhiteSpace(sortField))
+                        sortField = "FirstName";
+
+                    cmd.CommandText = string.Format ( sql, fields ) + whereSql 
+                                + $" ORDER BY {sortField} {(sortFullTimeEmployee ? "FULLTIMEEMPLOYEE" : "ASC")}" + pageSql;
+
+                    using (var rdr = cmd.ExecuteReader())
+                    {
+                        while (rdr.Read())
+                        {
+                            var emp = new Employee();
+                            emp.EmployeeId = rdr.GetInt32(rdr.GetOrdinal("EmployeeId"));
+                            emp.FirstName = rdr.GetString(rdr.GetOrdinal("FirstName"));
+                            emp.LastName = rdr.GetString(rdr.GetOrdinal("LastName"));
+                            emp.Phone = rdr.GetString(rdr.GetOrdinal("Phone"));
+                            emp.Email = rdr.GetString(rdr.GetOrdinal("Email"));
+                            emp.HireDate = rdr.GetDateTime(rdr.GetOrdinal("HireDate"));
+                            if (!(rdr.IsDBNull(rdr.GetOrdinal("EmployeeImage"))))
+                            {
+                                emp.EmployeeImage = (byte[])rdr["EmployeeImage"];
+                            }
+
+                            emp.FullTimeEmployee = rdr.GetBoolean(rdr.GetOrdinal("FullTimeEmployee"));
+
+                            employees.Add(emp);
+                        }
+                    }
+                }
+            }
+
+            return employees;
+        }
     }
 }
