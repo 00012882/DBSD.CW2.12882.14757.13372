@@ -1,8 +1,12 @@
-﻿using DBSD.CW2._12882._14757._13372.DAL;
+﻿using CsvHelper;
+using DBSD.CW2._12882._14757._13372.DAL;
 using DBSD.CW2._12882._14757._13372.Models;
+using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Drawing.Printing;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Web;
@@ -13,6 +17,7 @@ namespace DBSD.CW2._12882._14757._13372.Controllers
 {
     public class EmployeeController : Controller
     {
+
         // GET: Employee
         public ActionResult Index(string FirstName, string LastName, DateTime? HireDate, int? page, string sort)
         {
@@ -45,10 +50,15 @@ namespace DBSD.CW2._12882._14757._13372.Controllers
             return View(pagedList);
         }
 
+        
+
+
         // GET: Employee/Details/5
         public ActionResult Details(int id)
         {
-            return View();
+            var repository = new EmployeeRepository();
+            var emp = repository.GetById(id);
+            return View(emp);
         }
 
         // GET: Employee/Create
@@ -142,6 +152,28 @@ namespace DBSD.CW2._12882._14757._13372.Controllers
                 return File(employee.EmployeeImage, "image/jpeg", employee.FirstName + ".jpg");
             }
             return null;
+        }
+
+        [HttpGet]
+        public ActionResult ImportFromXml()
+        {
+            return View(new List<Employee>());
+        }
+
+        [HttpPost]
+        public ActionResult ImportFromXml(IFormFile importFile)
+        {
+            string xml;
+            using (var stream = importFile.OpenReadStream())
+            using (var rdr = new StreamReader(stream))
+            {
+                xml = rdr.ReadToEnd();
+            }
+
+            var repository = new EmployeeRepository(); 
+            var employees = repository.ImportFromXml(xml);
+
+            return View("ImportFromXml", employees);
         }
     }
 }

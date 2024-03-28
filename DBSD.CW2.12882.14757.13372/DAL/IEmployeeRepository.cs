@@ -10,13 +10,18 @@ namespace DBSD.CW2._12882._14757._13372.DAL
 {
     public interface IEmployeeRepository
     {
-        IList<Employee> GetAll();
+        Task<IEnumerable<Employee>> GetAll();
 
         IList<Employee> Filter(string FirstName, string LastName, DateTime? HireDate, int page, int pageSize,
                                 string sortField, bool sortFullTimeEmployee, out int totalCount);
 
-        void Insert(Employee emp);
+        int Insert(Employee emp);
         Employee GetById(int id);
         void Update(Employee emp);
+
+        IEnumerable<Employee> ImportFromXml(string xml);
+        IEnumerable<Employee> ImportFromJson(string json);
+
+
     }
 }

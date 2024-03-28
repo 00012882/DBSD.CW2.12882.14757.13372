@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CsvHelper.Configuration.Attributes;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -24,6 +25,8 @@ namespace DBSD.CW2._12882._14757._13372.Models
 
         [DisplayName("HireDate")]
         public DateTime HireDate { get; set; }
+
+        [Ignore]
         public byte[] EmployeeImage { get; set; }
         public bool FullTimeEmployee { get; set; }
     }

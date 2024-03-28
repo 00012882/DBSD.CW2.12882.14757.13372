@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Web;
 using System.Web.Configuration;
 
@@ -18,26 +19,19 @@ namespace DBSD.CW2._12882._14757._13372.DAL
                 return WebConfigurationManager.ConnectionStrings["BelissimoConnStr"].ConnectionString;
             }
         }
-        public IList<Employee> GetAll()
+        public async Task<IEnumerable<Employee>> GetAll()
         {
-            IList<Employee> employees = new List<Employee>();
-            using (var conn = new SqlConnection(ConnStr))
+            var list = new List<Employee>();
+            using (var conn = new SqlConnection(ConnStr)) 
             {
-                using(var cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"SELECT [EmployeeID]
-                                              ,[FirstName]
-                                              ,[LastName]
-                                              ,[Phone]
-                                              ,[Email]
-                                              ,[HireDate]
-                                              ,[EmployeeImage]
-                                              ,[FullTimeEmployee]
-                                          FROM [dbo].[Employees]";
-                    conn.Open();
-                    using(var  rdr = cmd.ExecuteReader())
+                    cmd.CommandText = "getAllEmployees";
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    await conn.OpenAsync();
+                    using (var rdr = await cmd.ExecuteReaderAsync())
                     {
-                        while (rdr.Read())
+                        while (await rdr.ReadAsync())
                         {
                             var emp = new Employee();
                             emp.EmployeeId = rdr.GetInt32(rdr.GetOrdinal("EmployeeId"));
@@ -52,15 +46,18 @@ namespace DBSD.CW2._12882._14757._13372.DAL
                             }
 
                             emp.FullTimeEmployee = rdr.GetBoolean(rdr.GetOrdinal("FullTimeEmployee"));
-
-                            employees.Add(emp);
+                            list.Add(emp);
                         }
+                        return list;
                     }
+                    
                 }
-            }
-
-            return employees;
+                
+            } 
+            
         }
+
+
 
         public Employee GetById(int id)
         {
@@ -106,35 +103,19 @@ namespace DBSD.CW2._12882._14757._13372.DAL
             }
         }
 
-        public void Insert(Employee emp)
+        public int Insert(Employee emp)
         {
-            using(var conn = new SqlConnection(ConnStr))
+            using (var conn = new SqlConnection(ConnStr))
             {
-                using(var cmd = conn.CreateCommand())
+                using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = @"INSERT INTO [dbo].[Employees]
-                                                       ([FirstName]
-                                                       ,[LastName]
-                                                       ,[Phone]
-                                                       ,[Email]
-                                                       ,[HireDate]
-                                                       ,[EmployeeImage]
-                                                       ,[FullTimeEmployee])
-                                                 VALUES
-                                                       (@FirstName
-                                                       ,@LastName
-                                                       ,@Phone
-                                                       ,@Email
-                                                       ,@HireDate
-                                                       ,@EmployeeImage
-                                                       ,@FullTimeEmployee)";
-
+                    cmd.CommandText = "InsertEmployee";
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@FirstName", emp.FirstName);
                     cmd.Parameters.AddWithValue("@LastName", emp.FirstName);
                     cmd.Parameters.AddWithValue("@Phone", emp.Phone);
                     cmd.Parameters.AddWithValue("@Email", emp.Email);
                     cmd.Parameters.AddWithValue("@HireDate", emp.HireDate);
-
                     if (emp.EmployeeImage != null)
                     {
                         cmd.Parameters.Add("@EmployeeImage", SqlDbType.VarBinary, -1).Value = emp.EmployeeImage;
@@ -143,11 +124,37 @@ namespace DBSD.CW2._12882._14757._13372.DAL
                     {
                         cmd.Parameters.Add("@EmployeeImage", SqlDbType.VarBinary, -1).Value = DBNull.Value;
                     }
-
                     cmd.Parameters.AddWithValue("@FullTimeEmployee", emp.FullTimeEmployee);
 
+                    var pError = cmd.Parameters.Add
+                        (
+                            "@Errors",
+                            sqlDbType: SqlDbType.NVarChar,
+                            size: 1000
+                        );
+                    pError.Direction = ParameterDirection.Output;
+
+                    var pRetVal = cmd.Parameters.Add
+                        (
+                            "RetVal",
+                            sqlDbType: SqlDbType.Int
+                        );
+                    pRetVal.Direction = ParameterDirection.ReturnValue;
                     conn.Open();
-                    cmd.ExecuteNonQuery();
+
+                    int? id = (int?)cmd.ExecuteScalar();
+                    emp.EmployeeId = id ?? 0;
+
+                    int code = (int)pRetVal.Value;
+                    string err = pError.Value is DBNull
+                        ? ""
+                        : (string)pError.Value;
+
+                    if(code != 0)
+                    {
+                        throw new Exception($"code={code}, error={err}");
+                    }
+                    return id ?? 0;
                 }
             }
         }
@@ -311,6 +318,47 @@ namespace DBSD.CW2._12882._14757._13372.DAL
             }
 
             return employees;
+        }
+
+        public IEnumerable<Employee> ImportFromXml(string xml)
+        {
+            List<Employee> employees = new List<Employee>();
+            using (var conn = new SqlConnection(ConnStr))
+            {
+                conn.Open();
+                using (var cmd = new SqlCommand("InsertEmployee", conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.Add(new SqlParameter("@xml", SqlDbType.Xml) { Value = xml });
+
+                    using (var rdr = cmd.ExecuteReader())
+                    {
+                        while (rdr.Read())
+                        {
+                            var emp = new Employee();
+                            emp.EmployeeId = rdr.GetInt32(rdr.GetOrdinal("EmployeeId"));
+                            emp.FirstName = rdr.GetString(rdr.GetOrdinal("FirstName"));
+                            emp.LastName = rdr.GetString(rdr.GetOrdinal("LastName"));
+                            emp.Phone = rdr.GetString(rdr.GetOrdinal("Phone"));
+                            emp.Email = rdr.GetString(rdr.GetOrdinal("Email"));
+                            emp.HireDate = rdr.GetDateTime(rdr.GetOrdinal("HireDate"));
+                            if (!(rdr.IsDBNull(rdr.GetOrdinal("EmployeeImage"))))
+                            {
+                                emp.EmployeeImage = (byte[])rdr["EmployeeImage"];
+                            }
+
+                            emp.FullTimeEmployee = rdr.GetBoolean(rdr.GetOrdinal("FullTimeEmployee"));
+                            employees.Add(emp);
+                        }
+                    }
+                }
+            }
+            return employees;
+        }
+
+        public IEnumerable<Employee> ImportFromJson(string json)
+        {
+            throw new NotImplementedException();
         }
     }
 }
